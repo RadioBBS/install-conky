@@ -1,0 +1,26 @@
+# install-conky – Git-Ausschlussliste.
+#
+# Projekt:     install-conky
+# Modul:       .gitignore
+# Version:     1.1.0
+# Stand:       2026-08-23
+# Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
+# Bezug:       requirements.txt (leer – kein Python)
+# Lizenz:      MIT
+# Upstream:    –
+# Erstellt mit: Cursor Grok 4.6
+# Autor:       (FFHB) / RadioBBS
+
+# Lokale Arbeitsverzeichnisse (Styleguide)
+__local__/
+__scratch__/
+__testdata__/
+
+# Logs (nur lokal)
+*.log
+install-conky.log
+
+# Editor/Betriebssystem
+.vscode/
+Thumbs.db
+Desktop.ini
