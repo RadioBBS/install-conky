@@ -2,7 +2,7 @@
 #
 # Projekt:     install-conky
 # Modul:       requirements.txt
-# Version:     1.1.0
+# Version:     1.2.0
 # Stand:       2026-08-23
 # Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
 # Bezug:       requirements.txt (leer – kein Python)
@@ -15,6 +15,7 @@
 # --------
 # Version 1.0.0 – 2026-08-23 – Erste Fassung (kein Python).
 # Version 1.1.0 – 2026-08-23 – Versionsgleichstand (LAN eth0, Randdocking).
+# Version 1.2.0 – 2026-08-23 – Versionsgleichstand (WLAN/ETH0 getrennt).
 #
 # Dieses Projekt nutzt kein Python; die Datei bleibt ohne Paketzeilen.
 # Fester Installationsweg (No-Op, pip ignoriert Kommentarzeilen):

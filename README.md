@@ -5,7 +5,7 @@ install-conky – Conky auf Raspberry Pi / Debian pruefen, einrichten und starte
 
 Projekt:     install-conky
 Modul:       README.md
-Version:     1.1.0
+Version:     1.2.0
 Stand:       2026-08-23
 Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
 Bezug:       requirements.txt (leer – kein Python)
@@ -24,10 +24,11 @@ Bedarf, legt Verzeichnisse und Config-Dateien an und startet Conky neu.
 Die Anzeige wird nicht per langer CLI gesteuert, sondern ueber die
 **Konfigurationstabelle oben in `install_conky.sh`**: Position, Schrift,
 Farbe, Transparenz und welche Bloecke sichtbar sind (IPv4, IPv6, WLAN,
-Signalstaerke, LAN eth0, Temperatur, CPU, RAM, Disk, …). Standard:
+Signalstaerke, LAN/ETH0, Temperatur, CPU, RAM, Disk, …). Standard:
 **unten rechts am Bildschirmrand angedockt**, weisse Schrift,
-Transparenz 90. Nach jeder Aenderung das Skript erneut mit `sudo`
-ausfuehren.
+Transparenz 90. Zwei Netzbloecke: **WLAN** (Netzname, IPv4, IPv6), danach
+**ETH0** (up/down, IPv4, IPv6). Nach jeder Aenderung das Skript erneut
+mit `sudo` ausfuehren.
 
 ## Voraussetzungen
 
@@ -108,6 +109,7 @@ Er installiert nichts und braucht kein sudo.
 
 - Version 1.0.0 – 2026-08-23 – Erste Version: Installation, Tabelle, Autostart.
 - Version 1.1.0 – 2026-08-23 – LAN eth0, Andocken unten rechts, Transparenz 90.
+- Version 1.2.0 – 2026-08-23 – WLAN und ETH0 getrennt (kein doppeltes WLAN-IP).
 
 ## Lizenz
 

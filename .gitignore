@@ -2,7 +2,7 @@
 #
 # Projekt:     install-conky
 # Modul:       .gitignore
-# Version:     1.1.0
+# Version:     1.2.0
 # Stand:       2026-08-23
 # Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
 # Bezug:       requirements.txt (leer – kein Python)

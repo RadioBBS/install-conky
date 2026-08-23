@@ -5,7 +5,7 @@ install-conky – Aenderungsverlauf des Projekts.
 
 Projekt:     install-conky
 Modul:       CHANGELOG.md
-Version:     1.1.0
+Version:     1.2.0
 Stand:       2026-08-23
 Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
 Bezug:       requirements.txt (leer – kein Python)
@@ -34,3 +34,8 @@ Format: `Version X.Y.Z – YYYY-MM-DD – Beschreibung` (neueste unten).
 - Anzeige am unteren rechten Bildschirmrand angedockt (`gap_x`/`gap_y` 0,
   Fenstertyp `override`).
 - Transparenz auf 90 gesetzt.
+
+## Version 1.2.0 – 2026-08-23
+
+- Netz-Anzeige getrennt: zuerst WLAN (Interface, Netzname, IPv4, IPv6),
+  danach ETH0 (up/down, IPv4, IPv6). Keine doppelte WLAN-Adresse mehr.

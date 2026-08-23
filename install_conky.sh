@@ -4,7 +4,7 @@
 #
 # Projekt:     install-conky
 # Modul:       install_conky.sh
-# Version:     1.1.0
+# Version:     1.2.0
 # Stand:       2026-08-23
 # Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
 # Bezug:       requirements.txt (leer – kein Python)
@@ -28,6 +28,8 @@
 # Version 1.1.0 – 2026-08-23 – LAN eth0 mit Trennstrich; Randabstand 0 und
 #                              Fenstertyp override (unten rechts andocken);
 #                              Transparenz 90.
+# Version 1.2.0 – 2026-08-23 – Netz-Bloecke getrennt: WLAN (Netz, IPv4, IPv6),
+#                              danach ETH0 (up/down, IPv4, IPv6).
 #
 # Aufruf / Nutzung
 # ----------------
@@ -42,7 +44,7 @@
 
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 VERSION_DATUM="2026-08-23"
 SKRIPTNAME="${0##*/}"
 END_PROMPT='Programmende: "Hit any Key or Enter"'
@@ -73,8 +75,8 @@ END_PROMPT='Programmende: "Hit any Key or Enter"'
 # CFG_SPALTE           | int    | 90             | Spalte fuer Messwerte
 # CFG_FENSTERTYP       | string | override       | Conky own_window_type
 #                      |        |                | override dockt an den Bildschirmrand
-# CFG_NETZWERK         | string | auto           | auto, wlan0, eth0, ...
-# CFG_LAN_IFACE        | string | eth0           | LAN-Schnittstelle (Anzeige)
+# CFG_NETZWERK         | string | auto           | WLAN-Interface: auto, wlan0
+# CFG_LAN_IFACE        | string | eth0           | LAN-Interface (ETH0-Anzeige)
 # CFG_ZEIGE_HOSTNAME   | ja/nein| ja             | Rechnername
 # CFG_ZEIGE_UHRZEIT    | ja/nein| ja             | Datum und Uhrzeit
 # CFG_ZEIGE_UPTIME     | ja/nein| ja             | Laufzeit
@@ -83,12 +85,12 @@ END_PROMPT='Programmende: "Hit any Key or Enter"'
 # CFG_ZEIGE_RAM        | ja/nein| ja             | Arbeitsspeicher
 # CFG_ZEIGE_DISK       | ja/nein| ja             | Belegung von /
 # CFG_ZEIGE_TEMPERATUR | ja/nein| ja             | SoC-/CPU-Temperatur
-# CFG_ZEIGE_IPV4       | ja/nein| ja             | IPv4 der Netzschnittstelle
-# CFG_ZEIGE_IPV6       | ja/nein| ja             | globale IPv6-Adresse
-# CFG_ZEIGE_WLAN       | ja/nein| ja             | verbundenes WLAN (SSID)
+# CFG_ZEIGE_IPV4       | ja/nein| ja             | IPv4 je Block (WLAN und ETH0)
+# CFG_ZEIGE_IPV6       | ja/nein| ja             | IPv6 je Block (WLAN und ETH0)
+# CFG_ZEIGE_WLAN       | ja/nein| ja             | WLAN-Block: Netzname, IPs
 # CFG_ZEIGE_SIGNAL     | ja/nein| ja             | WLAN-Signalstaerke
-# CFG_ZEIGE_NETZLAST   | ja/nein| ja             | Down-/Upload der Schnittstelle
-# CFG_ZEIGE_LAN        | ja/nein| ja             | LAN (eth0): Status, IP, Last
+# CFG_ZEIGE_NETZLAST   | ja/nein| nein           | Down-/Upload (nicht im Layout)
+# CFG_ZEIGE_LAN        | ja/nein| ja             | ETH0-Block: up/down, IPs
 # =============================================================================
 
 CFG_POSITION="unten_rechts"
@@ -118,7 +120,7 @@ CFG_ZEIGE_IPV4="ja"
 CFG_ZEIGE_IPV6="ja"
 CFG_ZEIGE_WLAN="ja"
 CFG_ZEIGE_SIGNAL="ja"
-CFG_ZEIGE_NETZLAST="ja"
+CFG_ZEIGE_NETZLAST="nein"
 CFG_ZEIGE_LAN="ja"
 
 # -----------------------------------------------------------------------------
@@ -339,8 +341,9 @@ Verzeichnisse und Konfiguration ein und startet Conky neu.
 
 Anzeigeparameter stehen in der KONFIGURATIONSTABELLE oben in dieser
 Datei (Position, Schrift, Transparenz, IPv4/IPv6, WLAN, Signal,
-LAN eth0, Temperatur, CPU, ...). Standard: unten rechts am Bildschirmrand
+LAN/ETH0, Temperatur, CPU, ...). Standard: unten rechts am Bildschirmrand
 angedockt, weisse Schrift, Transparenz 90.
+Zwei Netzbloecke: WLAN (Netzname, IPv4, IPv6), dann ETH0 (up/down, IPv4, IPv6).
 Nach Aenderungen das Skript erneut mit sudo ausfuehren.
 
 Verwendung:
@@ -647,50 +650,29 @@ finde_wlan_iface() {
 	return 1
 }
 
-finde_default_iface() {
-	#
-	# Beschreibung: Liefert die IPv4-Default-Route-Schnittstelle.
-	# Parameter:    keine
-	# Rueckgabewert: Name auf stdout oder leer
-	# Fehlerfaelle: keine Default-Route
-	# Beispiel:     finde_default_iface
-	#
-	ip -4 route show default 2>/dev/null | awk '{print $5; exit}'
-}
-
 ermittle_schnittstellen() {
 	#
-	# Beschreibung: Setzt NETZ_IFACE und WLAN_IFACE aus Tabelle und System.
+	# Beschreibung: Setzt WLAN_IFACE und LAN_IFACE getrennt (zwei NICs).
 	# Parameter:    keine
 	# Rueckgabewert: keines (globale Variablen)
-	# Fehlerfaelle: Fallback wlan0
+	# Fehlerfaelle: Fallback wlan0 / eth0
 	# Beispiel:     ermittle_schnittstellen
 	#
-	local wlan def
+	local wlan
 	wlan="$(finde_wlan_iface || true)"
-	def="$(finde_default_iface || true)"
 	if [ "$CFG_LAN_IFACE" = "auto" ]; then
 		LAN_IFACE="eth0"
 	else
 		LAN_IFACE="$CFG_LAN_IFACE"
 	fi
 	if [ "$CFG_NETZWERK" != "auto" ]; then
-		NETZ_IFACE="$CFG_NETZWERK"
 		WLAN_IFACE="$CFG_NETZWERK"
-		return 0
-	fi
-	if [ -n "$def" ]; then
-		NETZ_IFACE="$def"
 	elif [ -n "$wlan" ]; then
-		NETZ_IFACE="$wlan"
-	else
-		NETZ_IFACE="wlan0"
-	fi
-	if [ -n "$wlan" ]; then
 		WLAN_IFACE="$wlan"
 	else
-		WLAN_IFACE="$NETZ_IFACE"
+		WLAN_IFACE="wlan0"
 	fi
+	NETZ_IFACE="$WLAN_IFACE"
 }
 
 erster_normaluser() {
@@ -945,57 +927,61 @@ baustein_temperatur() {
 	zeile_label_wert "$label" "\${execi 5 awk '{printf \"%.1f\", \$1/1000}' /sys/class/thermal/thermal_zone0/temp} °C"
 }
 
-baustein_netz_adressen() {
+zeile_ipv4() {
 	#
-	# Beschreibung: IPv4- und globale IPv6-Adresse der Netzschnittstelle.
-	# Parameter:    keine
+	# Beschreibung: IPv4-Zeile fuer eine Schnittstelle, falls eingeschaltet.
+	# Parameter:    $1 = Interface-Name
 	# Rueckgabewert: keines
 	# Fehlerfaelle: Interface unbekannt -> Conky zeigt n/a
-	# Beispiel:     baustein_netz_adressen
+	# Beispiel:     zeile_ipv4 wlan0
 	#
-	if ist_ja "$CFG_ZEIGE_IPV4"; then
-		zeile_label_wert "IPv4" "\${addr ${NETZ_IFACE}}"
-	fi
-	if ist_ja "$CFG_ZEIGE_IPV6"; then
-		zeile_label_wert "IPv6" "\${execi 15 ip -6 -o addr show dev ${NETZ_IFACE} scope global 2>/dev/null | awk '{gsub(/\\/.*/,\"\",\$4); print \$4; exit}'}"
-	fi
+	ist_ja "$CFG_ZEIGE_IPV4" || return 0
+	zeile_label_wert "IPv4" "\${addr ${1}}"
+}
+
+zeile_ipv6() {
+	#
+	# Beschreibung: Globale IPv6-Zeile fuer eine Schnittstelle.
+	# Parameter:    $1 = Interface-Name
+	# Rueckgabewert: keines
+	# Fehlerfaelle: keine globale Adresse -> leer
+	# Beispiel:     zeile_ipv6 eth0
+	#
+	ist_ja "$CFG_ZEIGE_IPV6" || return 0
+	zeile_label_wert "IPv6" "\${execi 15 ip -6 -o addr show dev ${1} scope global 2>/dev/null | awk '{gsub(/\\/.*/,\"\",\$4); print \$4; exit}'}"
 }
 
 baustein_wlan() {
 	#
-	# Beschreibung: SSID, Signalstaerke und optional Netzlast.
+	# Beschreibung: WLAN-Block: Netzname, optional Signal, dann IPv4/IPv6.
 	# Parameter:    keine
 	# Rueckgabewert: keines
 	# Fehlerfaelle: kein WLAN -> leere Felder
 	# Beispiel:     baustein_wlan
 	#
-	if ist_ja "$CFG_ZEIGE_WLAN"; then
-		zeile_label_wert "WLAN" "\${execi 10 iwgetid -r 2>/dev/null || iw dev ${WLAN_IFACE} info 2>/dev/null | awk '/ssid/{print \$2; exit}'}"
-	fi
+	ist_ja "$CFG_ZEIGE_WLAN" || return 0
+	zeile_label_wert "WLAN" "${WLAN_IFACE}"
+	zeile_label_wert "Netz" "\${execi 10 iwgetid -r 2>/dev/null || iw dev ${WLAN_IFACE} info 2>/dev/null | awk '/ssid/{print \$2; exit}'}"
 	if ist_ja "$CFG_ZEIGE_SIGNAL"; then
 		zeile_label_wert "Signal" "\${execi 5 awk -v i=${WLAN_IFACE} '\$1 ~ i { printf \"%d%%\", \$3 * 100 / 70; exit }' /proc/net/wireless 2>/dev/null}"
 	fi
-	if ist_ja "$CFG_ZEIGE_NETZLAST"; then
-		zeile_label_wert "Netz" "down \${downspeed ${NETZ_IFACE}}  up \${upspeed ${NETZ_IFACE}}"
-	fi
+	zeile_ipv4 "$WLAN_IFACE"
+	zeile_ipv6 "$WLAN_IFACE"
 }
 
 baustein_lan() {
 	#
-	# Beschreibung: LAN-Block fuer eth0 (Status, IPv4/IPv6, Netzlast).
+	# Beschreibung: ETH0-Block: up/down, danach IPv4 und IPv6.
 	# Parameter:    keine
 	# Rueckgabewert: keines
-	# Fehlerfaelle: Interface down -> Conky zeigt down/n/a
+	# Fehlerfaelle: Interface down -> Conky zeigt down
 	# Beispiel:     baustein_lan
 	#
 	ist_ja "$CFG_ZEIGE_LAN" || return 0
 	anhaengen "\${hr}"
-	zeile_label_wert "LAN ${LAN_IFACE}" "\${if_up ${LAN_IFACE}}up\${else}down\${endif}"
-	zeile_label_wert "IPv4" "\${addr ${LAN_IFACE}}"
-	if ist_ja "$CFG_ZEIGE_IPV6"; then
-		zeile_label_wert "IPv6" "\${execi 15 ip -6 -o addr show dev ${LAN_IFACE} scope global 2>/dev/null | awk '{gsub(/\\/.*/,\"\",\$4); print \$4; exit}'}"
-	fi
-	zeile_label_wert "Netz" "down \${downspeed ${LAN_IFACE}}  up \${upspeed ${LAN_IFACE}}"
+	zeile_label_wert "ETH0" "\${if_up ${LAN_IFACE}}up\${else}down\${endif}"
+	zeile_ipv4 "$LAN_IFACE"
+	zeile_ipv6 "$LAN_IFACE"
 }
 
 baue_conky_text() {
@@ -1012,12 +998,9 @@ baue_conky_text() {
 	baustein_cpu
 	baustein_ram_disk
 	baustein_temperatur
-	if ist_ja "$CFG_ZEIGE_IPV4" || ist_ja "$CFG_ZEIGE_IPV6" \
-		|| ist_ja "$CFG_ZEIGE_WLAN" || ist_ja "$CFG_ZEIGE_SIGNAL" \
-		|| ist_ja "$CFG_ZEIGE_NETZLAST"; then
+	if ist_ja "$CFG_ZEIGE_WLAN" || ist_ja "$CFG_ZEIGE_LAN"; then
 		anhaengen "\${hr}"
 	fi
-	baustein_netz_adressen
 	baustein_wlan
 	baustein_lan
 }

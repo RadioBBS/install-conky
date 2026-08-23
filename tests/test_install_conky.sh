@@ -4,7 +4,7 @@
 #
 # Projekt:     install-conky
 # Modul:       tests/test_install_conky.sh
-# Version:     1.1.0
+# Version:     1.2.0
 # Stand:       2026-08-23
 # Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
 # Bezug:       requirements.txt (leer – kein Python)
@@ -22,6 +22,7 @@
 # --------
 # Version 1.0.0 – 2026-08-23 – Erste Testfassung.
 # Version 1.1.0 – 2026-08-23 – Defaults Transparenz 90, LAN eth0, Randdocking.
+# Version 1.2.0 – 2026-08-23 – WLAN- und ETH0-Bloecke getrennt geprueft.
 #
 # Aufruf / Nutzung
 # ----------------
@@ -30,7 +31,7 @@
 
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.2.0"
 VERSION_DATUM="2026-08-23"
 fehler=0
 
@@ -188,9 +189,19 @@ case "$dry" in
 	*) meld_fail "--dry-run ohne Fenstertyp override" ;;
 esac
 case "$dry" in
-	*"LAN eth0"*) meld_ok "--dry-run LAN eth0" ;;
-	*) meld_fail "--dry-run ohne LAN eth0" ;;
+	*"ETH0"*) meld_ok "--dry-run ETH0" ;;
+	*) meld_fail "--dry-run ohne ETH0" ;;
 esac
+if printf '%s\n' "$dry" | grep -Fq '${addr eth0}'; then
+	meld_ok "--dry-run IPv4 eth0"
+else
+	meld_fail "--dry-run ohne IPv4 eth0"
+fi
+if printf '%s\n' "$dry" | grep -q 'downspeed'; then
+	meld_fail "--dry-run enthaelt noch Netzlast (downspeed)"
+else
+	meld_ok "--dry-run ohne doppelte Netzlast"
+fi
 
 for datei in install_conky.sh tests/test_install_conky.sh; do
 	if grep -q $'\r' "$datei"; then
