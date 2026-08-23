@@ -5,7 +5,7 @@ install-conky – Aenderungsverlauf des Projekts.
 
 Projekt:     install-conky
 Modul:       CHANGELOG.md
-Version:     1.2.0
+Version:     1.3.0
 Stand:       2026-08-23
 Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
 Bezug:       requirements.txt (leer – kein Python)
@@ -39,3 +39,9 @@ Format: `Version X.Y.Z – YYYY-MM-DD – Beschreibung` (neueste unten).
 
 - Netz-Anzeige getrennt: zuerst WLAN (Interface, Netzname, IPv4, IPv6),
   danach ETH0 (up/down, IPv4, IPv6). Keine doppelte WLAN-Adresse mehr.
+
+## Version 1.3.0 – 2026-08-23
+
+- Trafficanzeige (Down/Up) wieder bei WLAN und LAN.
+- LAN- und WLAN-Schnittstelle werden vor der Config ermittelt
+  (`end0`/`eth0`/`wlan0` u. a.), nicht fest verdrahtet.

@@ -2,7 +2,7 @@
 #
 # Projekt:     install-conky
 # Modul:       project.toml
-# Version:     1.2.0
+# Version:     1.3.0
 # Stand:       2026-08-23
 # Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
 # Bezug:       requirements.txt (leer – kein Python)
@@ -14,7 +14,7 @@
 [projekt]
 name = "install-conky"
 zweck = "Conky auf Raspberry Pi / Debian pruefen, einrichten und starten"
-version = "1.2.0"
+version = "1.3.0"
 stand = "2026-08-23"
 lizenz = "MIT"
 autor = "(FFHB) / RadioBBS"
@@ -47,3 +47,8 @@ beschreibung = "LAN eth0, Andocken unten rechts, Transparenz 90"
 version = "1.2.0"
 datum = "2026-08-23"
 beschreibung = "WLAN- und ETH0-Bloecke getrennt, keine doppelte WLAN-IP"
+
+[[historie]]
+version = "1.3.0"
+datum = "2026-08-23"
+beschreibung = "Traffic je NIC, LAN/WLAN-Namen automatisch erkannt"
