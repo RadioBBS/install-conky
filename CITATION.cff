@@ -1,0 +1,29 @@
+# install-conky – Citation File Format (maschinenlesbare Zitation).
+#
+# Projekt:     install-conky
+# Modul:       CITATION.cff
+# Version:     1.3.0
+# Stand:       2026-08-23
+# Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
+# Bezug:       requirements.txt (leer – kein Python)
+# Lizenz:      MIT
+# Upstream:    –
+# Erstellt mit: Cursor Grok 4.6
+# Autor:       (FFHB) / RadioBBS
+#
+# Historie
+# --------
+# Version 1.3.0 – 2026-08-24 – Datei angelegt (Software-Standard 1.2.0).
+
+cff-version: 1.2.0
+message: "Bitte mit diesen Metadaten zitieren."
+title: install-conky
+abstract: Conky auf Raspberry Pi / Debian pruefen, einrichten und starten.
+version: "1.3.0"
+date-released: "2026-08-23"
+license: MIT
+authors:
+  - name: "(FFHB) / RadioBBS"
+repository-code: https://github.com/RadioBBS/install-conky
+url: https://github.com/RadioBBS/install-conky
+type: software

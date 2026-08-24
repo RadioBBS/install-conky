@@ -1,0 +1,31 @@
+# install-conky – Projektdefinition (Bash; pyproject fuer einheitliche Produktstruktur).
+#
+# Projekt:     install-conky
+# Modul:       pyproject.toml
+# Version:     1.3.0
+# Stand:       2026-08-23
+# Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
+# Bezug:       requirements.txt (leer – kein Python)
+# Lizenz:      MIT
+# Upstream:    –
+# Erstellt mit: Cursor Grok 4.6
+# Autor:       (FFHB) / RadioBBS
+#
+# Historie
+# --------
+# Version 1.3.0 – 2026-08-24 – Nachzug pyproject.toml (Software-Standard 1.2.0).
+#
+# Kein Python-Paket. Keine pip-Abhaengigkeiten.
+
+[project]
+name = "install-conky"
+version = "1.3.0"
+description = "Conky auf Raspberry Pi / Debian pruefen, einrichten und starten."
+readme = "README.md"
+license = { text = "MIT" }
+authors = [{ name = "(FFHB) / RadioBBS" }]
+dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/RadioBBS/install-conky"
+Repository = "https://github.com/RadioBBS/install-conky"
