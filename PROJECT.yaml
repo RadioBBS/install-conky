@@ -1,0 +1,58 @@
+# Werte muessen mit den Dateikoepfen uebereinstimmen (eine Quelle der Wahrheit).
+# Styleguide 1.7.0 / Software-Standard 1.2.0 – Agent zuerst diese Datei lesen.
+#
+# Projekt:     install-conky
+# Modul:       PROJECT.yaml
+# Version:     1.3.0
+# Stand:       2026-08-23
+# Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
+# Bezug:       requirements.txt (leer – kein Python)
+# Lizenz:      MIT
+# Upstream:    –
+# Erstellt mit: Cursor Grok 4.6
+# Autor:       (FFHB) / RadioBBS
+
+name: install-conky
+description: Conky auf Raspberry Pi / Debian pruefen, einrichten und starten
+language: bash
+bash_min: "4"
+license: MIT
+version: "1.3.0"
+stand: "2026-08-23"
+author: (FFHB) / RadioBBS
+upstream: "–"
+scripts:
+  - install_conky.sh
+repository:
+  host: github
+  owner: RadioBBS
+  name: install-conky
+  url: https://github.com/RadioBBS/install-conky
+  visibility: public
+  default_branch: main
+standards:
+  styleguide: "1.7.0"
+  styleguide_file: "%USERPROFILE%\\Documents\\Cursor\\.Security-and-Styleguide\\0-Style‑Guide.txt"
+  software_standard: "1.2.0"
+  software_standard_file: "%USERPROFILE%\\Documents\\Cursor\\.Security-and-Styleguide\\MY-SOFTWARE-STANDARD v1.0.0.txt"
+testing:
+  framework: bash
+  command: bash tests/test_install_conky.sh
+  required: true
+  live_install: false
+cli:
+  help: [--help, -h]
+  version: [--version]
+maintenance:
+  status: active
+  owner: RadioBBS
+documentation:
+  language: de
+security:
+  secrets_in_repo: false
+  scans_dot_directories: false
+machine_readable:
+  - PROJECT.yaml
+  - pyproject.toml
+  - CITATION.cff
+  - .github/workflows/ci.yml

@@ -4,7 +4,7 @@
 #
 # Projekt:     install-conky
 # Modul:       install_conky.sh
-# Version:     1.1.0
+# Version:     1.3.0
 # Stand:       2026-08-23
 # Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
 # Bezug:       requirements.txt (leer – kein Python)
@@ -28,6 +28,10 @@
 # Version 1.1.0 – 2026-08-23 – LAN eth0 mit Trennstrich; Randabstand 0 und
 #                              Fenstertyp override (unten rechts andocken);
 #                              Transparenz 90.
+# Version 1.2.0 – 2026-08-23 – Netz-Bloecke getrennt: WLAN (Netz, IPv4, IPv6),
+#                              danach ETH0 (up/down, IPv4, IPv6).
+# Version 1.3.0 – 2026-08-23 – Traffic wieder je Schnittstelle; LAN/WLAN
+#                              automatisch erkannt (nicht fest eth0/wlan0).
 #
 # Aufruf / Nutzung
 # ----------------
@@ -42,7 +46,7 @@
 
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.3.0"
 VERSION_DATUM="2026-08-23"
 SKRIPTNAME="${0##*/}"
 END_PROMPT='Programmende: "Hit any Key or Enter"'
@@ -73,8 +77,8 @@ END_PROMPT='Programmende: "Hit any Key or Enter"'
 # CFG_SPALTE           | int    | 90             | Spalte fuer Messwerte
 # CFG_FENSTERTYP       | string | override       | Conky own_window_type
 #                      |        |                | override dockt an den Bildschirmrand
-# CFG_NETZWERK         | string | auto           | auto, wlan0, eth0, ...
-# CFG_LAN_IFACE        | string | eth0           | LAN-Schnittstelle (Anzeige)
+# CFG_NETZWERK         | string | auto           | WLAN-Interface: auto oder Name
+# CFG_LAN_IFACE        | string | auto           | LAN-Interface: auto oder Name
 # CFG_ZEIGE_HOSTNAME   | ja/nein| ja             | Rechnername
 # CFG_ZEIGE_UHRZEIT    | ja/nein| ja             | Datum und Uhrzeit
 # CFG_ZEIGE_UPTIME     | ja/nein| ja             | Laufzeit
@@ -83,12 +87,12 @@ END_PROMPT='Programmende: "Hit any Key or Enter"'
 # CFG_ZEIGE_RAM        | ja/nein| ja             | Arbeitsspeicher
 # CFG_ZEIGE_DISK       | ja/nein| ja             | Belegung von /
 # CFG_ZEIGE_TEMPERATUR | ja/nein| ja             | SoC-/CPU-Temperatur
-# CFG_ZEIGE_IPV4       | ja/nein| ja             | IPv4 der Netzschnittstelle
-# CFG_ZEIGE_IPV6       | ja/nein| ja             | globale IPv6-Adresse
-# CFG_ZEIGE_WLAN       | ja/nein| ja             | verbundenes WLAN (SSID)
+# CFG_ZEIGE_IPV4       | ja/nein| ja             | IPv4 je Block (WLAN und LAN)
+# CFG_ZEIGE_IPV6       | ja/nein| ja             | IPv6 je Block (WLAN und LAN)
+# CFG_ZEIGE_WLAN       | ja/nein| ja             | WLAN-Block: Netzname, IPs
 # CFG_ZEIGE_SIGNAL     | ja/nein| ja             | WLAN-Signalstaerke
-# CFG_ZEIGE_NETZLAST   | ja/nein| ja             | Down-/Upload der Schnittstelle
-# CFG_ZEIGE_LAN        | ja/nein| ja             | LAN (eth0): Status, IP, Last
+# CFG_ZEIGE_NETZLAST   | ja/nein| ja             | Down-/Upload je Schnittstelle
+# CFG_ZEIGE_LAN        | ja/nein| ja             | LAN-Block: Name, up/down, IPs
 # =============================================================================
 
 CFG_POSITION="unten_rechts"
@@ -105,7 +109,7 @@ CFG_MIN_BREITE="280"
 CFG_SPALTE="90"
 CFG_FENSTERTYP="override"
 CFG_NETZWERK="auto"
-CFG_LAN_IFACE="eth0"
+CFG_LAN_IFACE="auto"
 CFG_ZEIGE_HOSTNAME="ja"
 CFG_ZEIGE_UHRZEIT="ja"
 CFG_ZEIGE_UPTIME="ja"
@@ -339,8 +343,10 @@ Verzeichnisse und Konfiguration ein und startet Conky neu.
 
 Anzeigeparameter stehen in der KONFIGURATIONSTABELLE oben in dieser
 Datei (Position, Schrift, Transparenz, IPv4/IPv6, WLAN, Signal,
-LAN eth0, Temperatur, CPU, ...). Standard: unten rechts am Bildschirmrand
+LAN, Temperatur, CPU, ...). Standard: unten rechts am Bildschirmrand
 angedockt, weisse Schrift, Transparenz 90.
+Zwei Netzbloecke: WLAN (Netz, IPv4, IPv6, Traffic), dann LAN (erkannt,
+up/down, IPv4, IPv6, Traffic). Schnittstellennamen werden ermittelt.
 Nach Aenderungen das Skript erneut mit sudo ausfuehren.
 
 Verwendung:
@@ -630,66 +636,158 @@ setze_logdatei() {
 	fi
 }
 
-finde_wlan_iface() {
+ist_virtuelle_iface() {
 	#
-	# Beschreibung: Findet die erste WLAN-Schnittstelle im Sysfs.
-	# Parameter:    keine
-	# Rueckgabewert: Interface-Name auf stdout, Exit 1 wenn keine
-	# Fehlerfaelle: kein wireless-Verzeichnis
-	# Beispiel:     finde_wlan_iface
+	# Beschreibung: Erkennt virtuelle oder interne Schnittstellen.
+	# Parameter:    $1 = Interface-Name
+	# Rueckgabewert: 0 wenn virtuell, sonst 1
+	# Fehlerfaelle: keine
+	# Beispiel:     ist_virtuelle_iface docker0
 	#
-	local pfad
-	for pfad in /sys/class/net/*/wireless; do
-		[ -e "$pfad" ] || continue
-		basename "$(dirname "$pfad")"
-		return 0
-	done
+	case "$1" in
+		lo|docker*|veth*|virbr*|br-*|tun*|tap*|wg*|tailscale*|zt*) return 0 ;;
+		vmnet*|vboxnet*|dummy*|bond*|sit*|gre*) return 0 ;;
+	esac
 	return 1
 }
 
-finde_default_iface() {
+ist_wlan_geraet() {
 	#
-	# Beschreibung: Liefert die IPv4-Default-Route-Schnittstelle.
+	# Beschreibung: Prueft, ob eine Schnittstelle ein WLAN-Geraet ist.
+	# Parameter:    $1 = Interface-Name
+	# Rueckgabewert: 0 wenn WLAN, sonst 1
+	# Fehlerfaelle: Sysfs fehlt -> 1
+	# Beispiel:     ist_wlan_geraet wlan0
+	#
+	[ -d "/sys/class/net/${1}/wireless" ] || [ -d "/sys/class/net/${1}/phy80211" ]
+}
+
+ist_lan_geraet() {
+	#
+	# Beschreibung: Prueft, ob eine Schnittstelle kabelgebundenes Ethernet ist.
+	# Parameter:    $1 = Interface-Name
+	# Rueckgabewert: 0 wenn LAN, sonst 1
+	# Fehlerfaelle: Sysfs fehlt -> 1
+	# Beispiel:     ist_lan_geraet end0
+	#
+	local typ
+	[ -d "/sys/class/net/${1}" ] || return 1
+	ist_virtuelle_iface "$1" && return 1
+	ist_wlan_geraet "$1" && return 1
+	typ="$(cat "/sys/class/net/${1}/type" 2>/dev/null || echo 0)"
+	[ "$typ" = "1" ]
+}
+
+iface_ist_up() {
+	#
+	# Beschreibung: Prueft den operstate einer Schnittstelle.
+	# Parameter:    $1 = Interface-Name
+	# Rueckgabewert: 0 wenn up, sonst 1
+	# Fehlerfaelle: Datei fehlt -> 1
+	# Beispiel:     iface_ist_up eth0
+	#
+	[ "$(cat "/sys/class/net/${1}/operstate" 2>/dev/null || true)" = "up" ]
+}
+
+finde_wlan_iface() {
+	#
+	# Beschreibung: Findet die WLAN-Schnittstelle (wlan0 bevorzugt).
 	# Parameter:    keine
-	# Rueckgabewert: Name auf stdout oder leer
-	# Fehlerfaelle: keine Default-Route
-	# Beispiel:     finde_default_iface
+	# Rueckgabewert: Interface-Name auf stdout, Exit 1 wenn keine
+	# Fehlerfaelle: kein wireless/phy80211
+	# Beispiel:     finde_wlan_iface
 	#
-	ip -4 route show default 2>/dev/null | awk '{print $5; exit}'
+	local pfad iface erster=""
+	if ist_wlan_geraet "wlan0"; then
+		printf '%s\n' "wlan0"
+		return 0
+	fi
+	for pfad in /sys/class/net/*/wireless /sys/class/net/*/phy80211; do
+		[ -e "$pfad" ] || continue
+		iface="$(basename "$(dirname "$pfad")")"
+		[ -z "$erster" ] && erster="$iface"
+		if iface_ist_up "$iface"; then
+			printf '%s\n' "$iface"
+			return 0
+		fi
+	done
+	[ -n "$erster" ] && { printf '%s\n' "$erster"; return 0; }
+	return 1
+}
+
+finde_lan_iface() {
+	#
+	# Beschreibung: Findet die LAN-Karte (end0/eth0, sonst erstes Ethernet).
+	# Parameter:    keine
+	# Rueckgabewert: Interface-Name auf stdout, Exit 1 wenn keine
+	# Fehlerfaelle: kein Ethernet im Sysfs
+	# Beispiel:     finde_lan_iface
+	#
+	local pfad iface erster=""
+	for iface in end0 eth0 eno1; do
+		if ist_lan_geraet "$iface"; then
+			printf '%s\n' "$iface"
+			return 0
+		fi
+	done
+	for pfad in /sys/class/net/*; do
+		[ -e "$pfad" ] || continue
+		iface="$(basename "$pfad")"
+		ist_lan_geraet "$iface" || continue
+		[ -z "$erster" ] && erster="$iface"
+		if iface_ist_up "$iface"; then
+			printf '%s\n' "$iface"
+			return 0
+		fi
+	done
+	[ -n "$erster" ] && { printf '%s\n' "$erster"; return 0; }
+	return 1
+}
+
+waehle_iface() {
+	#
+	# Beschreibung: Nimmt Vorgabe, wenn vorhanden, sonst Auto-Erkennung.
+	# Parameter:    $1 Vorgabe (auto|Name), $2 Art (wlan|lan)
+	# Rueckgabewert: Interface-Name auf stdout oder leer
+	# Fehlerfaelle: Vorgabe fehlt im Sysfs -> Warnung und Auto
+	# Beispiel:     waehle_iface auto lan
+	#
+	local vorgabe="$1" art="$2" gefunden=""
+	if [ "$vorgabe" != "auto" ]; then
+		if [ -d "/sys/class/net/${vorgabe}" ]; then
+			printf '%s\n' "$vorgabe"
+			return 0
+		fi
+		warn_meldung "${art}-Vorgabe ${vorgabe} nicht gefunden, suche automatisch."
+	fi
+	if [ "$art" = "wlan" ]; then
+		gefunden="$(finde_wlan_iface || true)"
+	else
+		gefunden="$(finde_lan_iface || true)"
+	fi
+	printf '%s\n' "$gefunden"
 }
 
 ermittle_schnittstellen() {
 	#
-	# Beschreibung: Setzt NETZ_IFACE und WLAN_IFACE aus Tabelle und System.
+	# Beschreibung: Ermittelt WLAN- und LAN-Interface getrennt.
 	# Parameter:    keine
-	# Rueckgabewert: keines (globale Variablen)
-	# Fehlerfaelle: Fallback wlan0
+	# Rueckgabewert: keines (WLAN_IFACE, LAN_IFACE, NETZ_IFACE)
+	# Fehlerfaelle: fehlende Karte -> Warnung, leerer Name
 	# Beispiel:     ermittle_schnittstellen
 	#
-	local wlan def
-	wlan="$(finde_wlan_iface || true)"
-	def="$(finde_default_iface || true)"
-	if [ "$CFG_LAN_IFACE" = "auto" ]; then
-		LAN_IFACE="eth0"
-	else
-		LAN_IFACE="$CFG_LAN_IFACE"
+	WLAN_IFACE="$(waehle_iface "$CFG_NETZWERK" wlan)"
+	LAN_IFACE="$(waehle_iface "$CFG_LAN_IFACE" lan)"
+	NETZ_IFACE="$WLAN_IFACE"
+	if [ -z "$WLAN_IFACE" ]; then
+		warn_meldung "Keine WLAN-Schnittstelle erkannt."
+	elif [ "$dry_run" != "true" ]; then
+		info_meldung "WLAN-Schnittstelle: ${WLAN_IFACE}"
 	fi
-	if [ "$CFG_NETZWERK" != "auto" ]; then
-		NETZ_IFACE="$CFG_NETZWERK"
-		WLAN_IFACE="$CFG_NETZWERK"
-		return 0
-	fi
-	if [ -n "$def" ]; then
-		NETZ_IFACE="$def"
-	elif [ -n "$wlan" ]; then
-		NETZ_IFACE="$wlan"
-	else
-		NETZ_IFACE="wlan0"
-	fi
-	if [ -n "$wlan" ]; then
-		WLAN_IFACE="$wlan"
-	else
-		WLAN_IFACE="$NETZ_IFACE"
+	if [ -z "$LAN_IFACE" ]; then
+		warn_meldung "Keine LAN-Schnittstelle erkannt."
+	elif [ "$dry_run" != "true" ]; then
+		info_meldung "LAN-Schnittstelle: ${LAN_IFACE}"
 	fi
 }
 
@@ -945,57 +1043,80 @@ baustein_temperatur() {
 	zeile_label_wert "$label" "\${execi 5 awk '{printf \"%.1f\", \$1/1000}' /sys/class/thermal/thermal_zone0/temp} °C"
 }
 
-baustein_netz_adressen() {
+zeile_ipv4() {
 	#
-	# Beschreibung: IPv4- und globale IPv6-Adresse der Netzschnittstelle.
-	# Parameter:    keine
+	# Beschreibung: IPv4-Zeile fuer eine Schnittstelle, falls eingeschaltet.
+	# Parameter:    $1 = Interface-Name
 	# Rueckgabewert: keines
 	# Fehlerfaelle: Interface unbekannt -> Conky zeigt n/a
-	# Beispiel:     baustein_netz_adressen
+	# Beispiel:     zeile_ipv4 wlan0
 	#
-	if ist_ja "$CFG_ZEIGE_IPV4"; then
-		zeile_label_wert "IPv4" "\${addr ${NETZ_IFACE}}"
-	fi
-	if ist_ja "$CFG_ZEIGE_IPV6"; then
-		zeile_label_wert "IPv6" "\${execi 15 ip -6 -o addr show dev ${NETZ_IFACE} scope global 2>/dev/null | awk '{gsub(/\\/.*/,\"\",\$4); print \$4; exit}'}"
-	fi
+	ist_ja "$CFG_ZEIGE_IPV4" || return 0
+	zeile_label_wert "IPv4" "\${addr ${1}}"
+}
+
+zeile_ipv6() {
+	#
+	# Beschreibung: Globale IPv6-Zeile fuer eine Schnittstelle.
+	# Parameter:    $1 = Interface-Name
+	# Rueckgabewert: keines
+	# Fehlerfaelle: keine globale Adresse -> leer
+	# Beispiel:     zeile_ipv6 eth0
+	#
+	ist_ja "$CFG_ZEIGE_IPV6" || return 0
+	zeile_label_wert "IPv6" "\${execi 15 ip -6 -o addr show dev ${1} scope global 2>/dev/null | awk '{gsub(/\\/.*/,\"\",\$4); print \$4; exit}'}"
+}
+
+zeile_traffic() {
+	#
+	# Beschreibung: Down-/Upload einer Schnittstelle, falls eingeschaltet.
+	# Parameter:    $1 = Interface-Name
+	# Rueckgabewert: keines
+	# Fehlerfaelle: Interface unbekannt -> Conky zeigt 0
+	# Beispiel:     zeile_traffic wlan0
+	#
+	ist_ja "$CFG_ZEIGE_NETZLAST" || return 0
+	[ -n "$1" ] || return 0
+	zeile_label_wert "Traffic" "down \${downspeed ${1}}  up \${upspeed ${1}}"
 }
 
 baustein_wlan() {
 	#
-	# Beschreibung: SSID, Signalstaerke und optional Netzlast.
+	# Beschreibung: WLAN-Block: Netz, Signal, IPv4/IPv6, Traffic.
 	# Parameter:    keine
 	# Rueckgabewert: keines
-	# Fehlerfaelle: kein WLAN -> leere Felder
+	# Fehlerfaelle: kein Interface -> Block entfaellt
 	# Beispiel:     baustein_wlan
 	#
-	if ist_ja "$CFG_ZEIGE_WLAN"; then
-		zeile_label_wert "WLAN" "\${execi 10 iwgetid -r 2>/dev/null || iw dev ${WLAN_IFACE} info 2>/dev/null | awk '/ssid/{print \$2; exit}'}"
-	fi
+	ist_ja "$CFG_ZEIGE_WLAN" || return 0
+	[ -n "$WLAN_IFACE" ] || return 0
+	zeile_label_wert "WLAN" "${WLAN_IFACE}"
+	zeile_label_wert "Netz" "\${execi 10 iwgetid -r 2>/dev/null || iw dev ${WLAN_IFACE} info 2>/dev/null | awk '/ssid/{print \$2; exit}'}"
 	if ist_ja "$CFG_ZEIGE_SIGNAL"; then
 		zeile_label_wert "Signal" "\${execi 5 awk -v i=${WLAN_IFACE} '\$1 ~ i { printf \"%d%%\", \$3 * 100 / 70; exit }' /proc/net/wireless 2>/dev/null}"
 	fi
-	if ist_ja "$CFG_ZEIGE_NETZLAST"; then
-		zeile_label_wert "Netz" "down \${downspeed ${NETZ_IFACE}}  up \${upspeed ${NETZ_IFACE}}"
-	fi
+	zeile_ipv4 "$WLAN_IFACE"
+	zeile_ipv6 "$WLAN_IFACE"
+	zeile_traffic "$WLAN_IFACE"
 }
 
 baustein_lan() {
 	#
-	# Beschreibung: LAN-Block fuer eth0 (Status, IPv4/IPv6, Netzlast).
+	# Beschreibung: LAN-Block: erkannter Name, up/down, IPv4/IPv6, Traffic.
 	# Parameter:    keine
 	# Rueckgabewert: keines
-	# Fehlerfaelle: Interface down -> Conky zeigt down/n/a
+	# Fehlerfaelle: kein Interface -> Block entfaellt
 	# Beispiel:     baustein_lan
 	#
 	ist_ja "$CFG_ZEIGE_LAN" || return 0
-	anhaengen "\${hr}"
-	zeile_label_wert "LAN ${LAN_IFACE}" "\${if_up ${LAN_IFACE}}up\${else}down\${endif}"
-	zeile_label_wert "IPv4" "\${addr ${LAN_IFACE}}"
-	if ist_ja "$CFG_ZEIGE_IPV6"; then
-		zeile_label_wert "IPv6" "\${execi 15 ip -6 -o addr show dev ${LAN_IFACE} scope global 2>/dev/null | awk '{gsub(/\\/.*/,\"\",\$4); print \$4; exit}'}"
+	[ -n "$LAN_IFACE" ] || return 0
+	if ist_ja "$CFG_ZEIGE_WLAN" && [ -n "$WLAN_IFACE" ]; then
+		anhaengen "\${hr}"
 	fi
-	zeile_label_wert "Netz" "down \${downspeed ${LAN_IFACE}}  up \${upspeed ${LAN_IFACE}}"
+	zeile_label_wert "LAN" "${LAN_IFACE} \${if_up ${LAN_IFACE}}up\${else}down\${endif}"
+	zeile_ipv4 "$LAN_IFACE"
+	zeile_ipv6 "$LAN_IFACE"
+	zeile_traffic "$LAN_IFACE"
 }
 
 baue_conky_text() {
@@ -1012,12 +1133,9 @@ baue_conky_text() {
 	baustein_cpu
 	baustein_ram_disk
 	baustein_temperatur
-	if ist_ja "$CFG_ZEIGE_IPV4" || ist_ja "$CFG_ZEIGE_IPV6" \
-		|| ist_ja "$CFG_ZEIGE_WLAN" || ist_ja "$CFG_ZEIGE_SIGNAL" \
-		|| ist_ja "$CFG_ZEIGE_NETZLAST"; then
+	if ist_ja "$CFG_ZEIGE_WLAN" || ist_ja "$CFG_ZEIGE_LAN"; then
 		anhaengen "\${hr}"
 	fi
-	baustein_netz_adressen
 	baustein_wlan
 	baustein_lan
 }
@@ -1261,7 +1379,7 @@ schreibe_configs() {
 	schreibe_autostart
 	schreibe_state
 	info_meldung "Config geschrieben: $conf"
-	info_meldung "Schnittstelle ${NETZ_IFACE}, WLAN ${WLAN_IFACE}, Position ${CFG_POSITION}."
+	info_meldung "WLAN ${WLAN_IFACE:-(keine)}, LAN ${LAN_IFACE:-(keine)}, Position ${CFG_POSITION}."
 }
 
 stoppe_conky() {

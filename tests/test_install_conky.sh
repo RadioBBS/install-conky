@@ -4,7 +4,7 @@
 #
 # Projekt:     install-conky
 # Modul:       tests/test_install_conky.sh
-# Version:     1.1.0
+# Version:     1.3.0
 # Stand:       2026-08-23
 # Abhaengig:   bash >= 4, apt, conky (Paket), Debian/Raspberry Pi OS
 # Bezug:       requirements.txt (leer – kein Python)
@@ -22,6 +22,8 @@
 # --------
 # Version 1.0.0 – 2026-08-23 – Erste Testfassung.
 # Version 1.1.0 – 2026-08-23 – Defaults Transparenz 90, LAN eth0, Randdocking.
+# Version 1.2.0 – 2026-08-23 – WLAN- und ETH0-Bloecke getrennt geprueft.
+# Version 1.3.0 – 2026-08-23 – Auto-Erkennung und Traffic geprueft.
 #
 # Aufruf / Nutzung
 # ----------------
@@ -30,7 +32,7 @@
 
 set -euo pipefail
 
-VERSION="1.1.0"
+VERSION="1.3.0"
 VERSION_DATUM="2026-08-23"
 fehler=0
 
@@ -162,6 +164,24 @@ else
 	meld_fail "Default LAN-Anzeige"
 fi
 
+if grep -q 'CFG_LAN_IFACE="auto"' "$SKRIPT"; then
+	meld_ok "Default LAN-Interface auto"
+else
+	meld_fail "Default LAN-Interface auto"
+fi
+
+if grep -q 'CFG_ZEIGE_NETZLAST="ja"' "$SKRIPT"; then
+	meld_ok "Default Trafficanzeige"
+else
+	meld_fail "Default Trafficanzeige"
+fi
+
+if grep -q 'finde_lan_iface()' "$SKRIPT" && grep -q 'finde_wlan_iface()' "$SKRIPT"; then
+	meld_ok "Erkennung LAN und WLAN"
+else
+	meld_fail "Erkennungsfunktionen fehlen"
+fi
+
 dry="$(bash "$SKRIPT" --dry-run)" || meld_fail "--dry-run Exit-Code"
 case "$dry" in
 	*"alignment = 'bottom_right'"*) meld_ok "--dry-run alignment bottom_right" ;;
@@ -187,10 +207,11 @@ case "$dry" in
 	*"own_window_type = 'override'"*) meld_ok "--dry-run Fenstertyp override" ;;
 	*) meld_fail "--dry-run ohne Fenstertyp override" ;;
 esac
-case "$dry" in
-	*"LAN eth0"*) meld_ok "--dry-run LAN eth0" ;;
-	*) meld_fail "--dry-run ohne LAN eth0" ;;
-esac
+if printf '%s\n' "$dry" | grep -q 'downspeed'; then
+	meld_ok "--dry-run Trafficanzeige"
+else
+	meld_fail "--dry-run ohne Trafficanzeige"
+fi
 
 for datei in install_conky.sh tests/test_install_conky.sh; do
 	if grep -q $'\r' "$datei"; then
